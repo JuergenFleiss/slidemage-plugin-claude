@@ -7,7 +7,8 @@ from stdin (one JSON line per call; with `--input-format stream-json` the text o
 and its image blocks as "images", each the block's source), then answers with stream-json events as
 $FAKE_CLAUDE_REPLIES says, a JSON list with one entry per call (the last one repeats): {"answer": {...}} is the structured result, {"error":
 "text"} an error result, {"exit": code} no result at all; "delay" waits that many seconds before the result, and
-"marker" is a file touched after the delay (a process that was killed never gets there); "when" makes it the
+"text" is a plain result, "message" and "assistant_error" set assistant event fields, and "result_event"
+overrides result event fields. "marker" is a file touched after the delay (a process that was killed never gets there); "when" makes it the
 reply to the first request that contains that text (processes started together cannot count their calls). Each
 call logs its start "time". It never talks to a model or the network."""
 from __future__ import annotations
@@ -41,13 +42,14 @@ if "-p" in sys.argv:
     emit({{"type": "system", "subtype": "init"}})
     if "exit" in reply:
         print("boom", file=sys.stderr); sys.exit(reply["exit"])
-    emit({{"type": "assistant", "message": {{}}}})
+    emit({{"type": "assistant", "message": reply.get("message", {{}}), "error": reply.get("assistant_error")}})
     time.sleep(reply.get("delay", 0))
     if reply.get("marker"):
         open(reply["marker"], "w").close()
     usage = {{"input_tokens": 3, "cache_read_input_tokens": 100, "output_tokens": 7}}
     emit({{"type": "result", "subtype": "success", "is_error": "error" in reply, "num_turns": 2, "usage": usage,
-          "result": reply.get("error", ""), "structured_output": reply.get("answer")}})
+          "result": reply.get("error", reply.get("text", "")), "structured_output": reply.get("answer"),
+          **reply.get("result_event", {{}})}})
     sys.exit(0)
 if log:
     with open(log, "w") as f:

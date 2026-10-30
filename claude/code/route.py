@@ -61,6 +61,10 @@ class ClaudeCodeRoute:
     def provider(self, ctx: Any, route: Route):
         return None
 
+    def request_provider(self, ctx: Any, route: Route):
+        from claude.code.provider import ClaudeCodeProvider
+        return ClaudeCodeProvider(self._claude(), route.model, route.effort)
+
     def task_runner(self, ctx: Any, route: Route):
         from claude.code.runner import run_task
         claude = self._claude()

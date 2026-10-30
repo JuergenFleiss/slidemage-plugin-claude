@@ -7,3 +7,5 @@ v1.0.1 (2026-10-29, website icon): The plugin has its own icon on the SlideMage 
 v1.0.2 (2026-10-30, hook on Windows): Claude Code no longer reports a failed UserPromptSubmit hook on Windows: the hook command now uses forward slashes in paths and double quotes, so Git Bash, which Claude Code runs it through, finds SlideMage.exe.
 
 v1.0.3 (2026-10-30, SlideMage names): The hook finds the project with every SlideMage version: Claude Code gets the project folder as SLIDEMAGE_PROJECT, which SlideMage reads from v10 on, and as SLIDEMASTER_PROJECT for the versions before. The tests name the project variable through SlideMage and the bibliography SlideMage.bib.
+
+v1.1.0 (2026-10-30, isolated chat requests): Claude Code can answer one self-contained ai.chat request on the chosen model and effort, with tools, inherited MCP servers and settings disabled. Replies accept free text or JSON without task validation, report CLI truncation signals, and abort ends the process. The assistant conversation stays in the terminal.
