@@ -68,13 +68,20 @@ class Run:
     turns: int = 0
     tokens_in: int = 0
     tokens_out: int = 0
+    text: str = ""
+    truncated: bool = False
+
+
+def _base_command(claude: Path, model: str, effort: str | None) -> list[str]:
+    return [str(claude), "-p", *(["--model", model] if model else []),
+            *(["--effort", effort] if effort else []), "--tools", "", "--no-session-persistence",
+            "--output-format", "stream-json", "--verbose", *ISOLATION]
 
 
 def _command(claude: Path, task: claude_tasks.Task, model: str, effort: str, images: bool) -> list[str]:
-    return [str(claude), "-p", "--model", model, "--effort", effort, "--tools", "", "--no-session-persistence",
+    return [*_base_command(claude, model, effort),
             *(("--input-format", "stream-json") if images else ()),
-            "--output-format", "stream-json", "--verbose", "--json-schema", json.dumps(task.schema),
-            *ISOLATION, "--system-prompt", task.rules]
+            "--json-schema", json.dumps(task.schema), "--system-prompt", task.rules]
 
 
 def _stdin(request: str, images: Sequence[Path]) -> str:
@@ -89,20 +96,25 @@ def _stdin(request: str, images: Sequence[Path]) -> str:
     return json.dumps({"type": "user", "message": message}) + "\n"
 
 
-def _take_result(run: Run, event: dict) -> None:
+def _take_result(run: Run, event: dict, structured: bool = True) -> None:
     """Note the answer, the error and the usage of a stream-json result event in `run`."""
     usage = event.get("usage", {})
     run.turns = event.get("num_turns", 0)
     run.tokens_in = sum(usage.get(k, 0) for k in ("input_tokens", "cache_creation_input_tokens",
                                                    "cache_read_input_tokens"))
     run.tokens_out = usage.get("output_tokens", 0)
+    run.truncated |= event.get("stop_reason") == "max_tokens"
     if event.get("is_error"):
         reason = str(event.get("result", ""))
         run.error = NOT_LOGGED_IN if "Not logged in" in reason else reason or "Claude reported an error."
     elif isinstance(event.get("structured_output"), dict):
         run.answer = event["structured_output"]
+        if not structured:
+            run.text = json.dumps(run.answer, ensure_ascii=False)
+    elif not structured and isinstance(event.get("result"), str):
+        run.text = event["result"]
     else:
-        run.error = "Claude gave no structured answer."
+        run.error = "Claude gave no structured answer." if structured else "Claude gave no answer."
 
 
 def _read_lines(stream, lines: queue.Queue) -> None:
@@ -112,7 +124,7 @@ def _read_lines(stream, lines: queue.Queue) -> None:
 
 
 def _run(argv: list[str], request: str, cwd: Path, env: dict[str, str], deadline: float,
-         cancel: threading.Event) -> Run:
+         cancel: threading.Event, *, structured: bool = True) -> Run:
     """Start `argv`, give it `request` and wait for its result event (until time.monotonic() is `deadline`);
     the process is gone when this returns."""
     started = time.monotonic()
@@ -147,10 +159,13 @@ def _run(argv: list[str], request: str, cwd: Path, env: dict[str, str], deadline
             except json.JSONDecodeError:
                 noise.append(line.strip())
                 continue
-            if event.get("type") == "assistant" and run.first_s is None:
-                run.first_s = time.monotonic() - started
+            if event.get("type") == "assistant":
+                if run.first_s is None:
+                    run.first_s = time.monotonic() - started
+                run.truncated |= (event.get("message", {}).get("stop_reason") == "max_tokens"
+                                  or event.get("error") == "max_output_tokens")
             if event.get("type") == "result":
-                _take_result(run, event)
+                _take_result(run, event, structured)
                 break
     finally:
         if proc.poll() is None:
@@ -163,10 +178,23 @@ def run_json(claude: Path, task: claude_tasks.Task, request: str, model: str, ef
              cancel: threading.Event, images: Sequence[Path] = ()) -> Run:
     """One process for `task` with `request` (and `images`): what it answered, unchecked. `deadline` is a
     time.monotonic() value."""
+    return _run_isolated(claude, _command(claude, task, model, effort, bool(images)), _stdin(request, images),
+                         deadline, cancel)
+
+
+def run_text(claude: Path, request: str, system: str, model: str, effort: str | None, deadline: float,
+             cancel: threading.Event, schema: dict | None = None) -> Run:
+    """One tool-free request, without a Task's validation or repair. JSON output becomes reply text."""
+    argv = [*_base_command(claude, model, effort), "--system-prompt", system,
+            *(["--json-schema", json.dumps(schema)] if schema is not None else [])]
+    return _run_isolated(claude, argv, request, deadline, cancel, structured=False)
+
+
+def _run_isolated(claude: Path, argv: list[str], request: str, deadline: float,
+                  cancel: threading.Event, *, structured: bool = True) -> Run:
     empty = Path(tempfile.mkdtemp(prefix="slidemage-claude-task-"))
     try:
-        return _run(_command(claude, task, model, effort, bool(images)), _stdin(request, images), empty,
-                    clean_environment(claude), deadline, cancel)
+        return _run(argv, request, empty, clean_environment(claude), deadline, cancel, structured=structured)
     finally:
         _remove_folder(empty)
 
