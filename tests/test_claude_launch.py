@@ -211,9 +211,8 @@ def test_image_description_language_instructions_reach_both_chats_and_guide():
 
     for prompt in (claude_launch.ORIENTATION, agent_context.SYSTEM_PROMPT, guides.GUIDES["images_and_text"][1]):
         assert "media/alt-text.json" in prompt
-        assert "short_de and long_de" in prompt and "in German" in prompt
-        assert "EN/DE segment" in prompt and "deck's editing language" in prompt
-        assert "Preserve existing descriptions in the other language" in prompt
+        assert "text.<code>.short" in prompt and "language segment" in prompt
+        assert "deck's editing language" in prompt and "Preserve the texts of the other languages" in prompt
 
 
 def test_a_session_id_names_the_conversation_or_resumes_it(tmp_path):
