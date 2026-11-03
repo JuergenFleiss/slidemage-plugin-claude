@@ -36,7 +36,7 @@ PNG = (b"\x89PNG\r\n\x1a\n" + _png_chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 
        + _png_chunk(b"IDAT", zlib.compress(b"\x00\x80")) + _png_chunk(b"IEND", b""))
 ANSWER = {"short": "A bar chart.", "long": "Two bars: A is higher than B.", "takeaway": "A beats B.",
           "role_suggestion": "informative"}
-GERMAN = {"short_de": "Ein Balkendiagramm.", "long_de": "Zwei Balken: A ist höher als B.", "takeaway_de": "A schlägt B."}
+GERMAN = {"short": "Ein Balkendiagramm.", "long": "Zwei Balken: A ist höher als B.", "takeaway": "A schlägt B."}
 
 
 def add_pictures(monkeypatch, root, **entries):
@@ -142,6 +142,18 @@ def test_a_translation_is_a_draft_of_the_existing_pipeline(ctx, root, claude, mo
     assert "--input-format" not in flags and call["images"] == []
     assert all(text in call["request"] for text in ("A bar chart.", "Two bars.", "A wins."))
     assert flags[flags.index("--system-prompt") + 1] == translation_prompts.get_effective_prompt(ctx, "sonnet", "en", "de").prompt
+
+
+def test_a_translation_goes_into_the_language_asked_for(ctx, root, claude, monkeypatch):  # noqa: F811
+    add_pictures(monkeypatch, root, chart=dict(short="A bar chart.", long="Two bars."))
+    claude.script({"answer": {"short": "Un graphique.", "long": "Deux barres.", "takeaway": ""}})
+    backend = alt_draft.for_language(claude_images.ClaudeTranslationBackend(ctx, claude.path), "fr")
+    summary = alt_draft.run_translation_batch(ctx, ["media/chart.png"], backend, language="fr")
+    assert summary.written == 1
+    entry = alt_images.load_store(ctx)["media/chart.png"]
+    assert entry.texts["fr"].short == "Un graphique." and "de" not in entry.texts
+    flags = claude.calls()[0]["argv"]
+    assert flags[flags.index("--system-prompt") + 1] == translation_prompts.get_effective_prompt(ctx, "sonnet", "en", "fr").prompt
 
 
 def test_a_translation_of_text_that_changed_meanwhile_is_not_written(ctx, root, claude, monkeypatch):  # noqa: F811

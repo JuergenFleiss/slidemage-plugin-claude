@@ -25,8 +25,8 @@ from claude.code import runner as claude_runner
 # The tasks of the bubbles. Their rules are the user's own prompts, which the backends put in at each call.
 DESCRIBE = claude_tasks.Task("describe_images", "", alt_draft.IMAGE_DESCRIPTION_SCHEMA)
 TRANSLATE = claude_tasks.Task("translate_images", "", {
-    "type": "object", "properties": {key: {"type": "string"} for key in ("short_de", "long_de", "takeaway_de")},
-    "required": ["short_de", "long_de", "takeaway_de"], "additionalProperties": False})
+    "type": "object", "properties": {key: {"type": "string"} for key in ("short", "long", "takeaway")},
+    "required": ["short", "long", "takeaway"], "additionalProperties": False})
 
 
 @dataclass
@@ -72,18 +72,23 @@ class ClaudeDraftBackend(_ClaudeBackend):
         return alt_draft.draft_from_fields(answer, self.label, elapsed)
 
 
+@dataclass
 class ClaudeTranslationBackend(_ClaudeBackend):
-    """Translates the three English fields of an image into German in one process; the prompt is the one
-    configured for the translations (translation_prompts), the fields go in the request."""
+    """Translates the three English fields of an image into `target_lang` (German unless SlideMage asks for another
+    language of the project) in one process; the prompt is the one configured for the translations
+    (translation_prompts), the fields go in the request."""
+
+    target_lang: str = "de"
 
     def translate(self, entry: alt_images.ImageEntry) -> alt_draft.TranslationResult:
         started = time.monotonic()
         source_hash = alt_images.en_text_hash(entry)       # of the text translated, as in ModelTranslationBackend
-        prompt = translation_prompts.get_effective_prompt(self.ctx, self.model, "en", "de").prompt
+        prompt = translation_prompts.get_effective_prompt(self.ctx, self.model, "en", self.target_lang).prompt
         request = "\n\n".join(("Translate the fields of this image description. A field that is empty stays empty.",
                                f"short:\n{entry.short}", f"long:\n{entry.long}", f"takeaway:\n{entry.takeaway_default}"))
         answer, error = self._ask(replace(TRANSLATE, rules=prompt), request, claude_runner.TEXT_DEADLINE_S)
         text = {key: str(answer.get(key) or "").strip() for key in TRANSLATE.schema["required"]}
         return alt_draft.TranslationResult(
-            short_de=text["short_de"], long_de=text["long_de"], takeaway_de=text["takeaway_de"], model=self.label,
-            elapsed_s=time.monotonic() - started, error=error or None, source_hash=source_hash)
+            short_de=text["short"], long_de=text["long"], takeaway_de=text["takeaway"], model=self.label,
+            elapsed_s=time.monotonic() - started, error=error or None, source_hash=source_hash,
+            language=self.target_lang)
