@@ -6,8 +6,11 @@ stdin; exit code 2 blocks the call and hands stderr to Claude as the reason, any
 
     SlideMage --plugin claude:hook           (argv supplied by host.entry_point_command)
 
-The rules are the chat tools' (tools/edits.py): an edit that changes a slide's protected parts (header
-comment, \\setSlideVersion, \\vbox to 0pt{...} blocks) is refused, and a frozen version (-vX-Y-Z.tex) is read-only.
+The rules are the chat tools' (tools/edits.py): an edit that changes a slide's protected parts, as SlideMage's
+plugin_api.protected_spans reports them, is refused, and a frozen version (-vX-Y-Z.tex) is read-only. From SlideMage
+v0.14.25 those are the '%%' lines at the top of a slide and its \\setSlideVersion line, and the ordinary '%' notes at
+the top are editable; before, the whole comment block at the top was protected. \\vbox to 0pt{...} blocks are not
+protected since SlideMage v9.4.0. The messages say whichever rule the running SlideMage applies (notes_editable).
 Everything else, and anything this hook cannot work out (except a slide that exists but cannot be read), is allowed: it must never get in the way of a
 call that is fine, and a crash is only a warning. It cannot see what a Bash command does to a file.
 """
@@ -30,19 +33,35 @@ UNREADABLE_MESSAGE = ("{name} cannot be read as UTF-8 text, so SlideMage cannot 
 FILE_TOOLS = ("Edit", "Write", "MultiEdit")
 
 
-# Same user-facing guard as core slide_protection; only the public span reader is needed.
-PROTECTED_MESSAGE = (
-    "That edit would change a protected part of the slide: the comment block at the top of the file, "
-    "the \\setSlideVersion line, or a \\vbox to 0pt{...} overlay block. SlideMage manages those; leave "
-    "them as they are and change only the rest of the slide.")
+# The same user-facing guard as SlideMage's slide_protection; only the public span reader is needed.
+_PROBE = "% a note\n%% Included in decks: x\n%%\n\n\\setSlideVersion{1-0-0}\nbody\n"
+
+
+def notes_editable() -> bool:
+    """Whether the running SlideMage leaves the ordinary '%' notes at the top of a slide editable (v0.14.25 on) or
+    protects the whole comment block there (before)."""
+    return all(not (start <= 0 < end) for start, end in protected_spans(_PROBE))
+
+
+def protected_description() -> str:
+    """What is protected, in the words of the running SlideMage's rule."""
+    if notes_editable():
+        return ("the '%%' lines at the top of the file (such as '%% Included in decks:') or the \\setSlideVersion "
+                "line. SlideMage manages those; leave them as they are and change only the rest of the slide. The "
+                "ordinary '%' notes at the top may be edited.")
+    return ("the comment block at the top of the file or the \\setSlideVersion line. SlideMage manages those; "
+            "leave them as they are and change only the rest of the slide.")
+
+
+PROTECTED_MESSAGE = "That edit would change a protected part of the slide: " + protected_description()
 
 
 def protected_problem(before: str, after: str) -> str | None:
+    """The message when `after` changes a protected part of `before`. The protected texts must stay the same and in
+    the same order. A non-comment line put above them, or moving them out of the comment block at the top, loses them
+    in SlideMage's reading and is refused that way too."""
     def parts(text: str):
-        spans = protected_spans(text)
-        first = spans[0][0] if spans else None
-        starts = first is not None and text[:first].lstrip("\ufeff") == ""
-        return [text[start:end] for start, end in spans], starts
+        return [text[start:end] for start, end in protected_spans(text)]
     return None if parts(before) == parts(after) else PROTECTED_MESSAGE
 
 

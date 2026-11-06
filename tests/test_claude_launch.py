@@ -31,7 +31,9 @@ def test_orientation_and_prompt_scope_agree_on_focus_and_keep_editor_guards():
     assert "Batch independent reads in one turn" in orientation
     assert "native Edit/Write for other files" in orientation
     assert "modify_slide" in orientation and "create_slide" in orientation
-    assert all(guard in orientation for guard in ("frozen", "leading '%%'", "\\setSlideVersion", "\\vbox to 0pt", "hook"))
+    assert all(guard in orientation for guard in ("frozen", "\\setSlideVersion", "hook", "measured page coordinates"))
+    from claude.code.hook import notes_editable
+    assert ("notes at the top of a slide are its own text" in orientation) == notes_editable()   # the running rule
     assert "do not explore" in scope and "switch_to_deck_mode" in scope
 
 

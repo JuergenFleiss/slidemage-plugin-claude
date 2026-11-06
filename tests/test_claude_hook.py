@@ -15,7 +15,7 @@ import pytest
 from conftest import SLIDE_TEXT
 
 from claude.code import hook as claude_hook
-from slidemage.slide_protection import PROTECTED_MESSAGE
+from claude.code.hook import PROTECTED_MESSAGE, notes_editable
 
 from slidemage import project as slidemage_project
 from slidemage.project import ProjectContext
@@ -43,6 +43,7 @@ def edit(root, old, new, name=CURRENT, **more):
     ("First point", "1st point"),
     ("\\item First point", "\\item First\n\t\t\\item inserted"),
     ("First point\r\n\t\t\\item Second point", "x"),
+    ("\\hbox{overlay}", "\\hbox{changed}"),                  # inside \vbox to 0pt{...}: editable since SlideMage v9.4.0
 ])
 def test_an_edit_of_the_body_is_allowed(ctx, root, old, new):
     assert claude_hook.blocked_reason(ctx, edit(root, old, new)) is None
@@ -51,7 +52,6 @@ def test_an_edit_of_the_body_is_allowed(ctx, root, old, new):
 @pytest.mark.parametrize("old, new", [
     ("%% Included in decks: test", "%% Included in decks: test, other"),         # the header comment
     ("\\setSlideVersion{1-0-0}", "\\setSlideVersion{2-0-0}"),
-    ("\\hbox{overlay}", "\\hbox{changed}"),                                       # inside \vbox to 0pt{...}
     ("\\setSlideVersion{1-0-0}\r\n", ""),                                         # deleting a protected line
     ("\\setSlideVersion{1-0-0}\r\n\\begin", "\\begin"),
 ])
@@ -74,11 +74,11 @@ def test_write_compares_the_whole_new_text(ctx, root):
 def test_multiedit_applies_the_edits_in_order(ctx, root):
     fine = [{"old_string": "First", "new_string": "1st"}, {"old_string": "Second", "new_string": "2nd"}]
     assert claude_hook.blocked_reason(ctx, event(root, "MultiEdit", edits=fine)) is None
-    bad = [*fine, {"old_string": "overlay", "new_string": "gone"}]
+    bad = [*fine, {"old_string": "1-0-0", "new_string": "9-9-9"}]
     assert claude_hook.blocked_reason(ctx, event(root, "MultiEdit", edits=bad)) == PROTECTED_MESSAGE
-    # the second edit works on the result of the first
-    chained = [{"old_string": "First", "new_string": "1st"},
-               {"old_string": "1st point", "new_string": "\\vbox to 0pt{\\vss\\hbox{new}}"}]
+    # a later edit with replace_all reaches the version line as well as the text the first edit wrote
+    chained = [{"old_string": "First", "new_string": "1-0-0 mark"},
+               {"old_string": "1-0-0", "new_string": "2-0-0", "replace_all": True}]
     assert claude_hook.blocked_reason(ctx, event(root, "MultiEdit", edits=chained)) == PROTECTED_MESSAGE
 
 
@@ -176,3 +176,21 @@ def test_the_hook_does_not_import_the_heavy_packages():
             "or m.startswith(('slidemage.ai.tools', 'slidemage.compiler', 'slidemage.preview_build', 'slidemage.slide_preview'))])")
     done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=60)
     assert done.stdout.strip() == "[]", done.stdout + done.stderr
+
+
+# SlideMage v0.14.25: the ordinary '%' notes at the top of a slide are its own text; only the '%%' lines are protected.
+NOTE = "% Source: a paper, slide 3.\r\n"
+
+
+@pytest.mark.skipif(not notes_editable(), reason="this SlideMage protects the whole comment block at the top")
+def test_a_note_at_the_top_may_change_when_slidemage_allows_it(ctx, root):
+    (root / "slides" / "abc-EN-Hello-current.tex").write_bytes((NOTE + SLIDE_TEXT).encode("utf-8"))
+    assert claude_hook.blocked_reason(ctx, edit(root, "a paper", "Smith (2020)")) is None
+    assert claude_hook.blocked_reason(ctx, edit(root, NOTE, "")) is None
+    assert claude_hook.blocked_reason(ctx, edit(root, "decks: test", "decks: x")) == PROTECTED_MESSAGE
+    assert "may be edited" in PROTECTED_MESSAGE
+
+
+def test_the_message_follows_the_running_slidemage_and_never_names_overlay_blocks():
+    assert "vbox" not in PROTECTED_MESSAGE and "setSlideVersion" in PROTECTED_MESSAGE
+    assert ("may be edited" in PROTECTED_MESSAGE) == notes_editable()
