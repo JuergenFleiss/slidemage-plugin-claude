@@ -22,6 +22,7 @@ from pathlib import Path
 from claude._processes import no_console_kwargs
 from slidemage.plugin_api import Host
 from claude.code.scope import FOCUS_ENV
+from claude.code.hook import notes_editable
 from slidemage.plugin_api import IMAGE_DESCRIPTION_RULES, CLAUDE_CODE_PRE_APPROVED
 
 SERVER_NAME = "slidemage"
@@ -44,8 +45,13 @@ ORIENTATION = (
     "render_preview when needed. Refreshing previews or compiling a deck is slow: use refresh_preview and "
     "refresh_deck_previews only when asked, and compile only when asked. Use check_readability to check and "
     "recheck readability changes. Slides are slides/<id>-<LANG>-<Slug>-current.tex, decks decks/<name>.tex. "
-    "Never edit a frozen slides/*-vX-Y-Z.tex, a slide's leading '%%' comment block, its \\setSlideVersion "
-    "line or a \\vbox to 0pt{...} block: a hook refuses those edits. Do not rename slides, change deck calls "
+    "Never edit a frozen slides/*-vX-Y-Z.tex, " + (
+        "the '%%' lines at the top of a slide (such as '%% Included in decks:') or its \\setSlideVersion line: a "
+        "hook refuses those edits. The ordinary '%' notes at the top of a slide are its own text and may be edited. "
+        if notes_editable() else
+        "a slide's comment block at the top (all its '%' lines) or its \\setSlideVersion line: a hook refuses those "
+        "edits. ") + "Overlay blocks (\\vbox to 0pt{...}) may be edited, but they hold measured page coordinates: "
+    "change those only when asked. Do not rename slides, change deck calls "
     "or touch other tool-managed lines unless asked. SlideMage reloads files you change; if the user has unsaved "
     "edits in the same file it asks them first. After native edits to slides or add_slide, call show_slide so "
     "they see it. To translate a slide, call translate_slide and then only say that SlideMage is translating it. "
