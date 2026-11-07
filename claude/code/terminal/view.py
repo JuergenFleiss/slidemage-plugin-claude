@@ -65,7 +65,7 @@ class ClaudeCodeView(QFrame):
         self._terminal_page = host.Surface()
         self._terminal_layout = QVBoxLayout(self._terminal_page)
         self._terminal_layout.setContentsMargins(0, 0, 0, 0)
-        self._terminal_layout.setSpacing(4)
+        self._terminal_layout.setSpacing(host.theme().space_xs)
         self._terminal_layout.addLayout(self._build_status_row())
         self.caption = host.caption("")
         self.caption.setTextFormat(Qt.TextFormat.RichText)
@@ -87,8 +87,9 @@ class ClaudeCodeView(QFrame):
         card = QFrame()
         self.host.style_chat_widget(card, "cloud_card")
         inner = QVBoxLayout(card)
-        inner.setContentsMargins(14, 14, 14, 14)
-        inner.setSpacing(8)
+        space = self.host.theme()
+        inner.setContentsMargins(space.space_xl, space.space_xl, space.space_xl, space.space_xl)
+        inner.setSpacing(space.space_md)
         head = QHBoxLayout()
         head.addWidget(self.host.IconLabel("cloud", 20))
         self.setup_title = QLabel()
@@ -374,7 +375,7 @@ class ClaudeCodeView(QFrame):
 
     def refresh_colors(self) -> None:
         palette = self.caption.palette()           # the caption's link: QSS cannot color it
-        palette.setColor(QPalette.ColorRole.Link, QColor(self.host.theme_color("info")))
+        palette.setColor(QPalette.ColorRole.Link, QColor(self.host.theme().info))
         self.caption.setPalette(palette)
         if self.terminal is not None:
             self.host.terminal().refresh_widget(self.terminal)

@@ -1,8 +1,8 @@
 id = "claude"
 name = "Claude"
-version = "1.2.1"
+version = "1.2.2"
 api_version = 1
-requires_slidemage = ">=0.13.31"
+requires_slidemage = ">=0.14.36"
 summary = "Claude Code and the Anthropic API as SlideMage's cloud AI."
 author = "Jürgen Fleiß"
 homepage = "https://github.com/SlideMage/slidemage-plugin-claude"
