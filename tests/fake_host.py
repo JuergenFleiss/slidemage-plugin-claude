@@ -132,9 +132,16 @@ class FakeHost:
     def insert_slides(self, deck, position, slides, language): self._unavailable()
     def edit_deck_text(self, deck, change): self._unavailable()
     def deck_language(self, deck): self._unavailable()
+    def project_languages(self): self._unavailable()
+    def project_root(self): return self.root
+    def deck_output_folder(self, deck, view="instructor"): self._unavailable()
+    def deck_slides(self, deck, view, language): self._unavailable()
+    def slide_source(self, ref): self._unavailable()
+    def open_slide(self, ref): self._unavailable()
     def open_url(self, url): self._unavailable()
     def open_deck_settings(self, deck, tab=None): self._unavailable()
-    def log(self, message): self._unavailable()
+    def log(self, message, level="info"): self._unavailable()
+    def debug_enabled(self): self._unavailable()
     def show_message(self, text, error=False): self._unavailable()
 
     def _register(self):
@@ -175,6 +182,7 @@ class FakeHost:
     def legacy_ollama_host(self): return "http://localhost:11434"
     def model_choices_changed(self, route_id): self.model_notifications.append(route_id)
     def acquire_route_task(self, route_id, label): self._unavailable()
+    def ai_chat(self): self._unavailable()
     def run_in_background_with_progress(self, work, progress, done):
         self.run_in_background(lambda: work(progress), done)
     def style_chat_widget(self, widget, role): pass
@@ -184,6 +192,19 @@ class FakeHost:
     def Chip(self, *args, **kwargs): self._unavailable()
     def IconButton(self, *args, **kwargs): self._unavailable()
     def IconLabel(self, *args, **kwargs): self._unavailable()
+    def Window(self, title): self._unavailable()
+    def Card(self, raised=False): self._unavailable()
+    def SegmentedControl(self, items, current=None): self._unavailable()
+    def Badge(self, text, tone="neutral"): self._unavailable()
+    def ElidedLabel(self, text): self._unavailable()
+    def RowButton(self, title, sub="", *, icon=None, chip=("", ""), selectable=False): self._unavailable()
+    def PlainList(self): self._unavailable()
+    def Label(self, text, role="body"): self._unavailable()
+    def ModalSheet(self, title, parent=None): self._unavailable()
+    def toast(self, parent, text): self._unavailable()
+    def theme(self): self._unavailable()
+    def on_theme_changed(self, callback): self._unavailable()
+    def icon(self, name, color, px=16): self._unavailable()
 
     def terminal(self):
         return self
