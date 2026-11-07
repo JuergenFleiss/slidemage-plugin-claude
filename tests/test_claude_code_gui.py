@@ -189,9 +189,10 @@ def test_typing_resize_theme_exit_restart_and_shutdown(env):
     assert env.view.status.text() == "Running"
     logged = json.loads(env.log.read_text())
     assert logged["cwd"] == str(env.root) and logged["project"] == str(env.root) and logged["term"] == "xterm-256color"
-    assert logged["argv"][0::2] == ["--mcp-config", "--settings", "--append-system-prompt"]    # the model is Claude Code's own
+    assert logged["argv"][:2] == ["--session-id", env.view.session.session_id]
+    assert logged["argv"][2::2] == ["--mcp-config", "--settings", "--append-system-prompt"]    # the model is Claude Code's own
     assert logged["token"] == env.view.session._server.token and logged["token"] not in json.dumps(logged["argv"])
-    assert env.view.session.mcp_url in logged["argv"][1]
+    assert env.view.session.mcp_url in logged["argv"][3]
     assert not (env.root / ".claude").exists() and not (env.root / ".mcp.json").exists()
     # what is typed reaches the process, its output the terminal
     env.view.terminal.bridge.send_input("hello there\r")
@@ -231,21 +232,22 @@ def test_typing_resize_theme_exit_restart_and_shutdown(env):
     wait_until(lambda: "Fake Claude Code" in terminal_text(env))
     assert "Claude Code ended" not in terminal_text(env) and sync._timer.isActive()
     # Restart of a running process: the old one is ended, and its end is not reported as the new one's
-    first = env.view.session._process
     session = env.view.session
-    old = session._generation
+    first = session._pty
+    first_process = first._process
     env.view.restart_button.click()
-    wait_until(lambda: session._process is not first and session.running and session._generation > old)
-    # Regression (1c7e047): queued output and exit from the previous process must not affect the new one.
-    session._ended.emit(old, 7)
-    session._chunk.emit(old, b"stale output\r\n")
+    wait_until(lambda: session._pty is not first and session.running)
+    # Core's test_plugin_terminal.py covers stale output in test_restart_drops_the_old_programs_late_output
+    # and late exit in test_input_reaches_the_program_and_stop_ends_it. Here check replacement and stopping.
     pump(0.3)
-    assert not first.alive and env.view.status.text() == "Running"
-    assert session._sync._timer.isActive() and "stale output" not in terminal_text(env)
+    assert not first.running and not first_process.alive and env.view.status.text() == "Running"
+    assert session._sync._timer.isActive()
     # Shutdown: process and MCP server are gone, twice is fine
-    session, process, port = env.view.session, env.view.session._process, env.view.session._server.port
+    pty, port = session._pty, session._server.port
+    process = pty._process
     env.window.assistant.shutdown()
-    assert not process.alive and not session.running and env.view.session is None and env.view.terminal is None
+    assert not process.alive and not pty.running and not session.running and session._pty is None
+    assert session._server is None and env.view.session is None and env.view.terminal is None
     with pytest.raises(OSError):
         socket.create_connection(("127.0.0.1", port), timeout=1)
     env.window.assistant.shutdown()
@@ -275,7 +277,8 @@ def test_switch_to_deck_mode_sets_the_scope_switch(env):
     start_view(env)
     client = Client(env.view.session._server)
     assert on_thread(lambda: client.text("switch_to_deck_mode")) == "SlideMage is in Deck Mode now: go on with the request."
-    assert env.view.scope.current() == claude_scope.DECK
+    assert env.view.session.scope == claude_scope.DECK
+    assert env.window.assistant.scope.current() == claude_scope.DECK
     assert claude_scope.load(env.view.session._focus_file)["scope"] == claude_scope.DECK
 
 
@@ -296,7 +299,8 @@ def test_the_scope_switch_and_the_focus_reach_the_hooks(env):
     wait_until(lambda: (claude_scope.load(focus_file) or {}).get("slide") == SLIDE)
     assert claude_scope.load(focus_file)["scope"] == claude_scope.SLIDE
     assert "THIS SLIDE" in claude_scope.prompt_context(claude_scope.load(focus_file))
-    env.view.scope._buttons[claude_scope.DECK].click()                  # the user switches to Deck
+    env.window.assistant.scope._buttons[claude_scope.DECK].click()     # the user switches to Deck
+    assert env.view.session.scope == claude_scope.DECK
     assert claude_scope.load(focus_file)["scope"] == claude_scope.DECK
     env.window.assistant.shutdown()
     assert not focus_file.exists()                                       # removed with the session
@@ -500,10 +504,12 @@ def test_attaching_is_off_while_claude_code_is_not_running(env):
 def test_saved_chat_choice_applies_on_start_and_restart(env):
     ai_profile.set_model_choice(env.window.project, ai_profile.CLAUDE_CODE, ai_profile.CHAT, "sonnet:medium")
     start_view(env)
-    assert json.loads(env.log.read_text())["argv"][:4] == ["--model", "sonnet", "--effort", "medium"]
+    assert json.loads(env.log.read_text())["argv"][:6] == [
+        "--session-id", env.view.session.session_id, "--model", "sonnet", "--effort", "medium"]
     ai_profile.set_model_choice(env.window.project, ai_profile.CLAUDE_CODE, ai_profile.CHAT, "opus:high")
     env.view.restart_button.click()
-    wait_until(lambda: json.loads(env.log.read_text())["argv"][:4] == ["--model", "opus", "--effort", "high"])
+    wait_until(lambda: json.loads(env.log.read_text())["argv"][:6] == [
+        "--session-id", env.view.session.session_id, "--model", "opus", "--effort", "high"])
 
 
 def test_mcp_toolbox_reads_scope_and_focus_on_gui_thread(env):
