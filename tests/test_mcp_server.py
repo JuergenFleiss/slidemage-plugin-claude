@@ -163,10 +163,10 @@ def test_render_preview_comes_back_as_an_image_content(mcp_tools, monkeypatch):
     mcp = mcp_tools
     monkeypatch.setattr(preview_target, "render_text", lambda *a, **k: mcp.root / "x.pdf")
     monkeypatch.setattr(slide_snapshot, "prepare_preview_images",
-                        lambda *a: ((b"\x89PNG-bytes", b"\x89PNG-bytes"), ()))
+                        lambda *a: ((b"\x89PNG-bytes", b"RIFF\0\0\0\0WEBP-bytes"), ()))
     content = mcp.call("render_preview")["content"]
     assert content[0]["type"] == "text" and content[1]["type"] == "image"
-    assert content[1]["mimeType"] == "image/png" and base64.b64decode(content[1]["data"]) == b"\x89PNG-bytes"
+    assert content[1]["mimeType"] == "image/webp" and base64.b64decode(content[1]["data"]) == b"RIFF\0\0\0\0WEBP-bytes"
 
 
 def test_add_slide_goes_through_and_a_failing_tool_is_an_error_result_not_a_crash(mcp):

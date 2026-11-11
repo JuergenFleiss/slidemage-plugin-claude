@@ -33,7 +33,11 @@ JSONRPC_PARSE_ERROR, JSONRPC_INVALID, JSONRPC_NO_METHOD, JSONRPC_BAD_PARAMS, JSO
 
 
 def _image_type(data: bytes) -> str:
-    return "image/png" if data.startswith(b"\x89PNG") else "image/jpeg"
+    if data.startswith(b"\x89PNG"):
+        return "image/png"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"         # the render store's pages since SlideMage v0.16.10
+    return "image/jpeg"
 
 
 class McpServer:
