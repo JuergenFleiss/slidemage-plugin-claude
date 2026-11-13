@@ -6,11 +6,17 @@ Claude in SlideMage, in two ways. You choose which one SlideMage uses, and can s
   the open deck. Claude Code reads and edits your slides with SlideMage's own tools, and stays inside what you are looking at: the
   **Slide / Deck** switch above the terminal says how far a request may reach. Parts of a slide that are protected (SlideMage's protected
   regions) are refused, whatever Claude Code tries. The terminal is the only thing this way does: SlideMage starts no hidden Claude Code runs
-  of its own. Ask Claude there for what the task buttons do on other routes, for example "fix the LaTeX errors on this slide" or "describe the images on
-  this slide". The Translate button types a ready prompt into Claude Code's input box, which you read, change if you like, and send with Enter
-  yourself. The other task buttons and AI requests of SlideMage's other features need the Anthropic API or a Local model, and say so on this route.
+  of its own. Ask Claude there for what you need, for example "fix the LaTeX errors on this slide"; the task buttons type their prompts there
+  (see below). AI requests of SlideMage's other features need the Anthropic API or a Local model, and say so on this route.
 - **The Anthropic API.** SlideMage talks to Anthropic directly with your API key, with no Claude Code installed. The chat is SlideMage's own, with
   the same tools; the task buttons and other features that send a text to a model run on it. It needs nothing but the Python standard library.
+
+**Task buttons on Claude Code.** The task buttons of a slide (translate, update a translation, fix LaTeX, proofread, make concise, better
+title, speaker note, make readable, rewrite and proofread a selection) and of a deck (translate missing slides, update outdated translations, fix
+LaTeX errors, summarise) type a ready prompt into Claude Code's input box. You read it, change it if you like, and send it with Enter yourself:
+SlideMage never sends it, and one click is one prompt. A button for a deck is one prompt for the whole deck, which names the deck and what
+to do, not a list of slides. If Claude Code is busy or its input box holds text, SlideMage says so and types nothing. Describing images and
+translating their descriptions need the Anthropic API or a Local model.
 
 **What leaves your computer.** With either way, the text of the slides you work on, the files and images your requests refer to, and
 what you type go to Anthropic (`api.anthropic.com`). Claude Code makes its own further connections, as Anthropic describes for it; SlideMage does not

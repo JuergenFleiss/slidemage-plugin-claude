@@ -206,15 +206,23 @@ def test_surface_start_failure_stops_watch_and_can_be_retried(qapp, host, monkey
         surface.shutdown()
 
 
-def test_translate_is_taken_as_a_prompt_with_the_slide_as_an_at_path(host, tmp_path):
+def test_every_task_is_taken_as_a_one_line_prompt_that_names_the_slide_or_the_deck(host, tmp_path):
     from types import SimpleNamespace
+    from claude.code.route import PROMPTS
     activate(host)
     code = host.routes["claude_code"]
     route, ctx = Route("claude_code", "translation"), SimpleNamespace(root=tmp_path)
-    slide = tmp_path / "slides" / "1y8-EN-Title-current.tex"
-    prompt = code.task_prompt(ctx, route, "translate", slide, "DE")
-    assert prompt.startswith("Translate @slides/1y8-EN-Title-current.tex into DE.") and "add_slide" in prompt
-    assert '@"slides/my slide-EN-T-current.tex"' in code.task_prompt(ctx, route, "translate", tmp_path / "slides" / "my slide-EN-T-current.tex", "DE")
-    assert code.task_prompt(ctx, route, "translate", None, "") == ""             # only asked whether it is taken
-    assert code.task_prompt(ctx, route, "update_translation", slide, "") is None
-    assert code.task_prompt(ctx, route, "proofread", slide, "") is None
+    slide, deck = tmp_path / "slides" / "1y8-EN-Title-current.tex", tmp_path / "decks" / "my deck.tex"
+    for key in PROMPTS:
+        task, in_deck = key.removesuffix("_deck"), key.endswith("_deck")
+        prompt = code.task_prompt(ctx, route, task, None if in_deck else slide, "DE", language_name="German",
+                                  instruction="shorter,\n\nplainer", deck_path=deck if in_deck else None)
+        assert ('@"decks/my deck.tex"' if in_deck else "@slides/1y8-EN-Title-current.tex") in prompt, key
+        assert "\r" not in prompt and "\n" not in prompt, key                  # a line end would send it
+        assert code.task_prompt(ctx, route, task, None, "") == ""             # only asked whether it is taken
+    assert code.task_prompt(ctx, route, "translate", slide, "DE", language_name="German").startswith(
+        "Translate @slides/1y8-EN-Title-current.tex into German. First read_guide translation.")
+    assert code.task_prompt(ctx, route, "rewrite", slide, "", instruction="shorter,\n\nplainer").endswith(
+        "What to do: shorter, plainer")
+    assert code.task_prompt(ctx, route, "describe_images", slide, "") is None          # image tasks stay on API / Local
+    assert code.task_prompt(ctx, route, "describe_images", None, "") is None

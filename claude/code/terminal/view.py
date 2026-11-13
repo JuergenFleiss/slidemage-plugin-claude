@@ -13,7 +13,7 @@ terminal keeps its text, the status chip says so and Restart starts a new one. C
 end the process.
 
 Under the terminal: the caption. The task buttons, their status line and the scope (This slide | Whole deck) are
-the assistant card's (tasks.py does the work); Translate types its prompt into Claude Code's input box (`fill_prompt`).
+the assistant card's (tasks.py does the work); they type their prompt into Claude Code's input box (`fill_prompt`).
 """
 from __future__ import annotations
 
@@ -68,8 +68,8 @@ class ClaudeCodeView(QFrame):
         self._terminal_layout.setContentsMargins(0, 0, 0, 0)
         self._terminal_layout.setSpacing(host.theme().space_xs)
         self._terminal_layout.addLayout(self._build_status_row())
-        self.caption = host.caption("Permissions and the conversation model are set in Claude Code. Translate types "
-                                    "its prompt here for you to send; the other task buttons "
+        self.caption = host.caption("Permissions and the conversation model are set in Claude Code. Task buttons type "
+                                    "their prompt here for you to send; image tasks "
                                     'need Cloud · Anthropic API or Local (<a href="setup">AI setup</a>).')
         self.caption.setTextFormat(Qt.TextFormat.RichText)
         self.caption.linkActivated.connect(lambda _link: (
