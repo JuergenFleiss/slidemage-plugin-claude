@@ -12,8 +12,8 @@ Images page). Leaving the route ends it
 terminal keeps its text, the status chip says so and Restart starts a new one. Closing the window and `shutdown()`
 end the process.
 
-Under the terminal: the caption with the model the task buttons of the header use. The task buttons, their status
-line and the scope (This slide | Whole deck) are the assistant card's (tasks.py does the work).
+Under the terminal: the caption. The task buttons, their status line and the scope (This slide | Whole deck) are
+the assistant card's (tasks.py does the work).
 """
 from __future__ import annotations
 
@@ -67,13 +67,13 @@ class ClaudeCodeView(QFrame):
         self._terminal_layout.setContentsMargins(0, 0, 0, 0)
         self._terminal_layout.setSpacing(host.theme().space_xs)
         self._terminal_layout.addLayout(self._build_status_row())
-        self.caption = host.caption("")
+        self.caption = host.caption("Permissions and the conversation model are set in Claude Code. The task buttons "
+                                    'need Cloud · Anthropic API or Local (<a href="setup">AI setup</a>).')
         self.caption.setTextFormat(Qt.TextFormat.RichText)
         self.caption.linkActivated.connect(lambda _link: (
             self._surface_context.open_ai_setup()))
         self._terminal_layout.addWidget(self.caption)
         self._stack.addWidget(self._terminal_page)
-        self.refresh_caption()
         self.refresh_colors()
         QCoreApplication.instance().aboutToQuit.connect(self.shutdown)
 
@@ -140,13 +140,6 @@ class ClaudeCodeView(QFrame):
         self.restart_button.clicked.connect(lambda: self.restart())     # a new conversation
         row.addWidget(self.restart_button)
         return row
-
-    def refresh_caption(self) -> None:
-        """What the header's task buttons run on: the model of the Claude Code route for fixes (AI setup)."""
-        route = self._surface_context.selected_route("claude_code", "fixes_notes_transcripts")
-        self.caption.setText("Permissions are handled in Claude Code. Conversation model: set in Claude Code. "
-                             f"Task buttons: {route.label.removeprefix('Claude Code · ')} "
-                             '(<a href="setup">AI setup</a>).')
 
     def _on_scope(self, scope: str) -> None:
         if self.session is not None:
@@ -231,12 +224,6 @@ class ClaudeCodeView(QFrame):
 
     def _set_attachable(self) -> None:
         self.attach_button.setEnabled(self.session is not None and self.session.running)
-
-    # -- the terminal's translate tool ---------------------------------------------------------------
-
-    def _translate_slide(self, path: Path) -> str:
-        """The terminal's translate_slide: the slide into view, then its Translate bubble (GUI thread)."""
-        return self._surface_context.translate_slide(path)
 
     # -- starting and stopping --------------------------------------------------------------------
 

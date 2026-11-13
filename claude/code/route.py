@@ -1,17 +1,14 @@
 # SPDX-FileCopyrightText: 2026 Stefan Palan, Jürgen Fleiß
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Claude Code's task runner and terminal conversation route."""
+"""Claude Code's terminal conversation route: the terminal is all it offers."""
 from __future__ import annotations
 
-import threading
 from typing import Any
 
-from slidemage.plugin_api import Host, Route
-from claude.api.route import TASKS
+from slidemage.plugin_api import Host, ProviderError, Route
 
-NO_CLAUDE = "Claude Code is not installed on this computer, so nothing was sent and no other model is used."
-CHAT_IN_TERMINAL = ("On Cloud · Claude Code the conversation is the terminal in the assistant; the chat "
-                    "with Ollama or the API is not available on this route.")
+TERMINAL_ONLY = ("On Cloud · Claude Code, ask Claude in the terminal. The task buttons and AI requests need "
+                 "Cloud · Anthropic API or Local.")
 MODELS = ("sonnet", "haiku", "opus")
 EFFORTS = ("low", "medium", "high")
 
@@ -20,19 +17,19 @@ class ClaudeCodeRoute:
     id = "claude_code"
     service = "Claude Code"
     is_local = False
-    tasks = TASKS
+    tasks = frozenset({"chat"})
 
     def __init__(self, host: Host) -> None:
         self.host = host
 
     def problem(self, ctx: Any, route: Route) -> str:
-        return CHAT_IN_TERMINAL if route.task == "chat" else ""
+        return TERMINAL_ONLY
 
     def model_choices(self, ctx: Any, task: str) -> list[str]:
-        return [f"{model}:{effort}" for model in MODELS for effort in EFFORTS]
+        return [f"{model}:{effort}" for model in MODELS for effort in EFFORTS] if task == "chat" else []
 
     def default_choice(self, task: str) -> str:
-        return "" if task == "chat" else "haiku:medium"
+        return ""
 
     def choice_label(self, choice: str) -> str:
         model, _, effort = choice.partition(":")
@@ -49,41 +46,23 @@ class ClaudeCodeRoute:
         return " · ".join(["Claude Code", *([route.model.capitalize(), f"effort {route.effort}"] if route.model
                                              else ["terminal"])])
 
-    @staticmethod
-    def _claude():
-        from slidemage.plugin_api import ProviderError
-        from claude.code.launch import find_claude
-        path = find_claude()
-        if path is None:
-            raise ProviderError(NO_CLAUDE)
-        return path
-
     def provider(self, ctx: Any, route: Route):
         return None
 
     def request_provider(self, ctx: Any, route: Route):
-        from claude.code.provider import ClaudeCodeProvider
-        return ClaudeCodeProvider(self._claude(), route.model, route.effort)
-
-    def task_runner(self, ctx: Any, route: Route):
-        from claude.code.runner import run_task
-        claude = self._claude()
-        def run(task, captured: str, request: str, cancel=None, span=None):
-            return run_task(ctx, claude, task, captured, request, route.model, route.effort,
-                            cancel=cancel, span=span)
-        return run
+        raise ProviderError(TERMINAL_ONLY)
 
     def draft_backend(self, ctx: Any, route: Route, cancel=None):
-        from claude.code.images import ClaudeDraftBackend
-        return ClaudeDraftBackend(ctx, self._claude(), route.model, route.effort, cancel or threading.Event())
+        return None
 
     def translation_backend(self, ctx: Any, route: Route, cancel=None):
-        from claude.code.images import ClaudeTranslationBackend
-        return ClaudeTranslationBackend(ctx, self._claude(), route.model, route.effort, cancel or threading.Event())
+        return None
 
     def slide_translator(self, ctx: Any, route: Route):
-        from claude.code.runner import SlideTranslator
-        return SlideTranslator(ctx, self._claude(), route.model, route.effort)
+        return None
+
+    def task_runner(self, ctx: Any, route: Route):
+        return None
 
     def chat_surface_v2(self, context):
         from claude.code.terminal.view import ClaudeCodeView

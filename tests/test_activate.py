@@ -14,6 +14,7 @@ import pytest
 
 from claude import activate
 from claude.code import hook, launch
+from claude.code.route import TERMINAL_ONLY
 from claude.credentials import ApiCredentials
 from fake_host import FakeHost, FakeSurfaceContext
 from slidemage.plugin_api import Route
@@ -32,7 +33,6 @@ def test_activate_registers_routes_one_combined_section_and_hook(host):
     build = host.sections[0][2]
     for route, service in zip(host.routes.values(), ("Anthropic API", "Claude Code")):
         assert route.service == service and route.is_local is False
-        assert route.tasks == {"chat", "translation", "image_description", "fixes_notes_transcripts"}
         assert route.settings_section() is None
     assert host.entry_points == {"hook": hook.main}
     assert host.secret.env_var == "ANTHROPIC_API_KEY"
@@ -65,7 +65,6 @@ with TemporaryDirectory() as folder:
     activate(FakeHost(Path(folder)))
 assert not any(n.startswith('PySide6') for n in sys.modules)
 assert 'claude.api.provider' not in sys.modules
-assert 'claude.code.runner' not in sys.modules
 assert 'claude.code.terminal.session' not in sys.modules
 """], env={**os.environ, "PYTHONPATH": os.pathsep.join(["tests", ".", os.environ.get("PYTHONPATH", "")])},
         capture_output=True, text=True)
@@ -80,8 +79,6 @@ def test_route_problems_and_static_choices(host, monkeypatch):
     api, code = host.routes.values()
     assert api.problem(None, Route("anthropic_api", "chat")).startswith("No Anthropic API key yet")
     assert api.model_choices(None, "chat") == []
-    assert "conversation is the terminal" in code.problem(None, Route("claude_code", "chat"))
-    assert code.problem(None, Route("claude_code", "translation")) == ""
     assert code.provider(None, Route("claude_code", "chat")) is None
     assert api.chat_surface() is None and api.task_runner(None, Route("anthropic_api", "chat")) is None
     assert api.draft_backend(None, Route("anthropic_api", "chat")) is None
@@ -92,8 +89,8 @@ def test_route_problems_and_static_choices(host, monkeypatch):
     assert code.split_choice("opus:high") == ("opus", "high")
     assert code.valid_choice(None, "opus:high") and not code.valid_choice(None, "opus:invalid")
     assert code.work_label(Route("claude_code", "chat")) == "Claude Code · terminal"
-    assert code.work_label(Route("claude_code", "translation", "opus", "high")) == "Claude Code · Opus · effort high"
-    assert code.default_choice("chat") == "" and code.default_choice("translation") == "haiku:medium"
+    assert code.work_label(Route("claude_code", "chat", "opus", "high")) == "Claude Code · Opus · effort high"
+    assert code.default_choice("chat") == "" and code.model_choices(None, "translation") == []
     assert code.choice_label("haiku:medium") == "Haiku · medium"
     assert len(code.model_choices(None, "chat")) == 9
     host.secret.set("sk-host")
@@ -101,9 +98,6 @@ def test_route_problems_and_static_choices(host, monkeypatch):
     assert api.default_choice("chat") in api.model_choices(None, "chat")
     provider = api.provider(None, SimpleNamespace(model="chosen-model", task="chat"))
     assert provider.model == "chosen-model" and provider._api_key == "sk-host"
-    from slidemage.plugin_api import ProviderError
-    with pytest.raises(ProviderError, match="not installed"):
-        code.task_runner(None, SimpleNamespace(model="haiku", effort="medium"))
 
 
 def test_legacy_credentials_use_host_migration_and_clear_never_resurrects(host, monkeypatch):
@@ -119,26 +113,16 @@ def test_legacy_credentials_use_host_migration_and_clear_never_resurrects(host, 
     assert credentials.get().value == "sk-env"
 
 
-def test_code_task_runner_and_backends_keep_the_selected_model(host, monkeypatch):
-    from claude.code import runner, images
-    monkeypatch.setattr(launch, "find_claude", lambda: host.root / "claude")
-    calls = []
-    monkeypatch.setattr(runner, "run_task", lambda *args, **kw: calls.append((args, kw)))
+def test_task_buttons_and_ai_requests_on_claude_code_say_to_use_the_terminal(host):
+    from slidemage.plugin_api import ProviderError
     activate(host)
     code = host.routes["claude_code"]
-    ctx = SimpleNamespace(root=host.root)
-    route = SimpleNamespace(model="opus", effort="high", task="translation")
-    import threading
-    cancel = threading.Event()
-    span = (2, 9)
-    code.task_runner(ctx, route)("task", "captured", "request", cancel, span)
-    assert calls == [((ctx, host.root / "claude", "task", "captured", "request", "opus", "high"), {"cancel": cancel, "span": span})]
-    assert code.draft_backend(ctx, route, cancel).cancel is cancel
-    assert isinstance(code.draft_backend(ctx, route), images.ClaudeDraftBackend)
-    assert code.translation_backend(ctx, route, cancel).cancel is cancel
-    assert isinstance(code.translation_backend(ctx, route), images.ClaudeTranslationBackend)
-    translator = code.slide_translator(ctx, route)
-    assert translator.model == "opus" and translator.effort == "high"
+    for task in ("chat", "translation", "fixes_notes_transcripts"):
+        assert code.problem(None, Route("claude_code", task)) == TERMINAL_ONLY
+    with pytest.raises(ProviderError) as refused:
+        code.request_provider(None, Route("claude_code", "chat", "opus", "high"))
+    assert str(refused.value) == TERMINAL_ONLY and "terminal" in TERMINAL_ONLY
+    assert code.task_runner(None, Route("claude_code", "translation")) is None
 
 
 def test_terminal_surface_uses_host_services_and_guards_late_callbacks(qapp, host, monkeypatch):

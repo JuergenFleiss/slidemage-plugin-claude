@@ -110,16 +110,16 @@ def test_the_environment_keeps_the_host_pythonpath_without_guessing_a_source_tre
     assert "PYTHONPATH" not in claude_launch.environment("t", tmp_path, tmp_path / "claude", {})
 
 
-def test_the_child_uses_the_users_own_login_not_keys_or_inherited_sessions(tmp_path):
-    base = {"PATH": "/usr/bin", "HOME": "/h", "ANTHROPIC_API_KEY": "sk-x", "ANTHROPIC_AUTH_TOKEN": "t",
-            "CLAUDECODE": "1", "CLAUDE_CODE_CHILD_SESSION": "1", "CLAUDE_CODE_SESSION_ID": "s",
-            "CLAUDE_CODE_ENTRYPOINT": "cli", "CLAUDE_CODE_USE_BEDROCK": "1", "CLAUDE_PID": "7",
-            "CLAUDE_CODE_OAUTH_TOKEN": "oauth", "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "9000", "ANTHROPIC_BASE_URL": "u"}
-    env = claude_launch.environment("t0k", tmp_path, tmp_path / "claude", base)
-    assert not {"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDECODE", "CLAUDE_CODE_CHILD_SESSION",
-                "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_PID"} & set(env)
-    assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "oauth" and env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == "9000"
-    assert env["ANTHROPIC_BASE_URL"] == "u" and env["HOME"] == "/h"          # other settings stay the user's
+def test_the_child_gets_the_users_own_login_but_not_the_markers_of_a_parent_session(tmp_path):
+    own = {"HOME": "/h", "ANTHROPIC_API_KEY": "sk-x", "ANTHROPIC_AUTH_TOKEN": "t",
+           "CLAUDE_CODE_OAUTH_TOKEN": "oauth", "CLAUDE_CODE_USE_BEDROCK": "1", "CLAUDE_CODE_SKIP_BEDROCK_AUTH": "1",
+           "CLAUDE_CODE_USE_VERTEX": "1", "CLAUDE_CODE_USE_FOUNDRY": "1", "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "9000",
+           "ANTHROPIC_BASE_URL": "u"}
+    parent = {"CLAUDECODE": "1", "CLAUDE_PID": "7", "CLAUDE_CODE_CHILD_SESSION": "1", "CLAUDE_CODE_SESSION_ID": "s",
+              "CLAUDE_CODE_ENTRYPOINT": "cli"}
+    env = claude_launch.environment("t0k", tmp_path, tmp_path / "claude", {**own, **parent})
+    assert not parent.keys() & env.keys()
+    assert own.items() <= env.items()
 
 
 def test_the_hook_command_quotes_the_host_argv_without_guessing_frozen_dispatch(tmp_path, monkeypatch):

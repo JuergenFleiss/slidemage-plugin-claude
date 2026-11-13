@@ -54,7 +54,8 @@ ORIENTATION = (
     "change those only when asked. Do not rename slides, change deck calls "
     "or touch other tool-managed lines unless asked. SlideMage reloads files you change; if the user has unsaved "
     "edits in the same file it asks them first. After native edits to slides or add_slide, call show_slide so "
-    "they see it. To translate a slide, call translate_slide and then only say that SlideMage is translating it. "
+    "they see it. To translate a slide, read it, then write the translated slide with add_slide or modify_slide as "
+    "the tools allow; do the translation yourself. "
     "Answer in the user's language, briefly: one or two sentences on what you did, no recap of slide content "
     "or list of things to check; end with at most one question offering a concrete next step. " + IMAGE_DESCRIPTION_RULES)
 
@@ -165,13 +166,14 @@ def has_transcript(session_id: str, base: dict[str, str] | None = None) -> bool:
     return bool(session_id) and any((home / "projects").glob(f"*/{session_id}.jsonl"))
 
 
-# Claude Code settings of the user that survive the clean-up of `environment`: a subscription token from
-# `claude setup-token`, and plain tuning. Everything else named CLAUDE_CODE_* is dropped: session markers of a
-# Claude Code that started SlideMage, and CLAUDE_CODE_USE_BEDROCK / _VERTEX / _FOUNDRY, which would replace the login.
-KEEP_CLAUDE_CODE = ("CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_MAX_OUTPUT_TOKENS", "CLAUDE_CODE_GIT_BASH_PATH",
+# Claude Code settings of the user that survive the clean-up of `environment`: the user's own login (a subscription
+# token from `claude setup-token`, an API key, Bedrock, Vertex or Foundry) and plain tuning. Everything else named
+# CLAUDE_CODE_* is dropped: the session markers of a Claude Code that started SlideMage.
+KEEP_CLAUDE_CODE = ("CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX",
+                    "CLAUDE_CODE_USE_FOUNDRY", "CLAUDE_CODE_SKIP_BEDROCK_AUTH", "CLAUDE_CODE_SKIP_VERTEX_AUTH",
+                    "CLAUDE_CODE_SKIP_FOUNDRY_AUTH", "CLAUDE_CODE_MAX_OUTPUT_TOKENS", "CLAUDE_CODE_GIT_BASH_PATH",
                     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC")
-DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDECODE", "CLAUDE_AGENT_SDK_VERSION", "CLAUDE_PID",
-        "CLAUDE_EFFORT")
+DROP = ("CLAUDECODE", "CLAUDE_AGENT_SDK_VERSION", "CLAUDE_PID", "CLAUDE_EFFORT")
 
 
 # How long Claude Code waits for one tool call of this server, in ms. Its default ends a call after about a
@@ -187,9 +189,8 @@ def _inherited(name: str) -> bool:
 
 
 def clean_environment(claude: Path, base: dict[str, str] | None = None) -> dict[str, str]:
-    """The app's environment, without what would stop Claude Code using the user's own login (an API key or auth
-    token in the environment, markers of a Claude Code session SlideMage was started from), and with `claude`'s
-    own folder on PATH (an npm install runs through `node` found there)."""
+    """The app's environment as the user set it, without the markers of a Claude Code session SlideMage was
+    started from, and with `claude`'s own folder on PATH (an npm install runs through `node` found there)."""
     env = {name: value for name, value in (os.environ if base is None else base).items() if _inherited(name)}
     env["PATH"] = os.pathsep.join([str(claude.parent), env.get("PATH", "")]) if env.get("PATH") else str(claude.parent)
     env.setdefault(MCP_TOOL_TIMEOUT_ENV, MCP_TOOL_TIMEOUT_MS)
@@ -203,7 +204,7 @@ PROJECT_ENVS = ("SLIDEMAGE_PROJECT", "SLIDEMASTER_PROJECT")
 
 def environment(token: str, project: Path, claude: Path, base: dict[str, str] | None = None,
                 focus_file: Path | None = None) -> dict[str, str]:
-    """The terminal's environment: a clean login, colour, the token and the hook's project/focus.
+    """The terminal's environment: the user's own login, colour, the token and the hook's project/focus.
 
     The host owns entry-point dispatch. Preserve its inherited PYTHONPATH without guessing a source tree.
     """

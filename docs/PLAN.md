@@ -6,7 +6,7 @@ Claude Code uses `chat_surface_v2`, the public chat context, terminal service, e
 
 Route tasks, image batches and slide translation are started and leased by core. This plugin has no separate long-running settings job requiring `acquire_route_task` or progress reporting; its sign-in probe uses the ordinary background service. `legacy_ollama_host` is not relevant to the Claude routes. Phase 7 core registers no built-in AI routes, leaving ownership of the Claude IDs to this plugin.
 
-The packaged plugin has no private SlideMage imports. Integration tests and the developer benchmark still import core internals to construct real application fixtures and compare behaviour; they are outside the package.
+The packaged plugin has no private SlideMage imports. Integration tests still import core internals to construct real application fixtures; they are outside the package.
 
 ## Before 1.0.0
 
@@ -16,4 +16,4 @@ The packaged plugin has no private SlideMage imports. Integration tests and the 
 
 ## Needs a decision
 
-- **Development-only imports:** removing private imports from integration tests and the benchmark would require replacing core-specific fixtures and benchmark functionality. Recommend retaining them until core supplies equivalent public test and benchmark interfaces; package imports already meet the strict checker.
+- **Development-only imports:** removing private imports from integration tests would require replacing core-specific fixtures. Recommend retaining them until core supplies equivalent public test interfaces; package imports already meet the strict checker.
