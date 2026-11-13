@@ -3,12 +3,14 @@
 """Claude Code's terminal conversation route: the terminal is all it offers."""
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from slidemage.plugin_api import Host, ProviderError, Route
+from claude.code.terminal.draft import mention
 
-TERMINAL_ONLY = ("On Cloud · Claude Code, ask Claude in the terminal. The task buttons and AI requests need "
-                 "Cloud · Anthropic API or Local.")
+TERMINAL_ONLY = ("On Cloud · Claude Code, ask Claude in the terminal. The task buttons (except Translate, which "
+                 "types its prompt there) and AI requests need Cloud · Anthropic API or Local.")
 MODELS = ("sonnet", "haiku", "opus")
 EFFORTS = ("low", "medium", "high")
 
@@ -63,6 +65,19 @@ class ClaudeCodeRoute:
 
     def task_runner(self, ctx: Any, route: Route):
         return None
+
+    def task_prompt(self, ctx: Any, route: Route, task_name: str, slide_path: Path | None, language: str) -> str | None:
+        """The Translate button types this into Claude Code's input box; the user sends it (view.fill_prompt). With no
+        slide core only asks whether the task is taken: it is."""
+        if task_name != "translate":
+            return None
+        if slide_path is None:
+            return ""
+        slide = mention(slide_path.relative_to(ctx.root).as_posix())
+        return (f"Translate {slide} into {language}. Call add_slide with translation_of set to that slide, language "
+                f"{language}, and a slug and frame title in {language}: it makes a linked copy and puts it after the "
+                "source in the deck. Then translate the copy's text in place with modify_slide. Keep LaTeX commands, "
+                "layout and labels unchanged.")
 
     def chat_surface_v2(self, context):
         from claude.code.terminal.view import ClaudeCodeView

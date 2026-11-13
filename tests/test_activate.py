@@ -204,3 +204,17 @@ def test_surface_start_failure_stops_watch_and_can_be_retried(qapp, host, monkey
         assert not host.watches[0].running
     finally:
         surface.shutdown()
+
+
+def test_translate_is_taken_as_a_prompt_with_the_slide_as_an_at_path(host, tmp_path):
+    from types import SimpleNamespace
+    activate(host)
+    code = host.routes["claude_code"]
+    route, ctx = Route("claude_code", "translation"), SimpleNamespace(root=tmp_path)
+    slide = tmp_path / "slides" / "1y8-EN-Title-current.tex"
+    prompt = code.task_prompt(ctx, route, "translate", slide, "DE")
+    assert prompt.startswith("Translate @slides/1y8-EN-Title-current.tex into DE.") and "add_slide" in prompt
+    assert '@"slides/my slide-EN-T-current.tex"' in code.task_prompt(ctx, route, "translate", tmp_path / "slides" / "my slide-EN-T-current.tex", "DE")
+    assert code.task_prompt(ctx, route, "translate", None, "") == ""             # only asked whether it is taken
+    assert code.task_prompt(ctx, route, "update_translation", slide, "") is None
+    assert code.task_prompt(ctx, route, "proofread", slide, "") is None

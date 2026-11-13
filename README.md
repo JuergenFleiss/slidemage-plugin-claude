@@ -6,9 +6,9 @@ Claude in SlideMage, in two ways. You choose which one SlideMage uses, and can s
   the open deck. Claude Code reads and edits your slides with SlideMage's own tools, and stays inside what you are looking at: the
   **Slide / Deck** switch above the terminal says how far a request may reach. Parts of a slide that are protected (SlideMage's protected
   regions) are refused, whatever Claude Code tries. The terminal is the only thing this way does: SlideMage starts no hidden Claude Code runs
-  of its own. Ask Claude there for what the task buttons do on other routes, for example "fix the LaTeX errors on this slide", "translate this
-  slide into German" or "describe the images on this slide". The task buttons and AI requests of SlideMage's other features need the Anthropic
-  API or a Local model, and say so on this route.
+  of its own. Ask Claude there for what the task buttons do on other routes, for example "fix the LaTeX errors on this slide" or "describe the images on
+  this slide". The Translate button types a ready prompt into Claude Code's input box, which you read, change if you like, and send with Enter
+  yourself. The other task buttons and AI requests of SlideMage's other features need the Anthropic API or a Local model, and say so on this route.
 - **The Anthropic API.** SlideMage talks to Anthropic directly with your API key, with no Claude Code installed. The chat is SlideMage's own, with
   the same tools; the task buttons and other features that send a text to a model run on it. It needs nothing but the Python standard library.
 

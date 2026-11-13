@@ -13,7 +13,7 @@ terminal keeps its text, the status chip says so and Restart starts a new one. C
 end the process.
 
 Under the terminal: the caption. The task buttons, their status line and the scope (This slide | Whole deck) are
-the assistant card's (tasks.py does the work).
+the assistant card's (tasks.py does the work); Translate types its prompt into Claude Code's input box (`fill_prompt`).
 """
 from __future__ import annotations
 
@@ -24,13 +24,14 @@ from PySide6.QtGui import QColor, QPalette, QShowEvent
 from PySide6.QtWidgets import QFileDialog, QFrame, QHBoxLayout, QLabel, QStackedWidget, QVBoxLayout
 
 from slidemage.plugin_api import ChatSurfaceContext, Host
-from .draft import input_box_shown, paste_bytes, prompt_draft
+from .draft import input_box_shown, mention, paste_bytes, prompt_draft
 
 SETUP, TERMINAL = 0, 1
 # switch_session: the pause between the two Esc of Esc Esc, and the time Claude Code gets to save the draft.
 ESC_GAP_MS, SAVE_DRAFT_MS = 250, 600
 # switch_session: how often and how long the restarted Claude Code is looked at for its input box, to type the draft.
 DRAFT_POLL_MS, DRAFT_WAIT_MS = 300, 20_000
+NOT_FREE = "Claude Code is busy or has text in its input box: wait until it is empty, then click again."
 NEVER_SENT = "Cloud stays selected. Nothing is sent and no other model is used"
 INSTALL_TEXT = ("SlideMage runs your own Claude Code here, in the project folder, with your Claude "
                 "subscription. It is not installed on this computer (or not found).")
@@ -67,7 +68,8 @@ class ClaudeCodeView(QFrame):
         self._terminal_layout.setContentsMargins(0, 0, 0, 0)
         self._terminal_layout.setSpacing(host.theme().space_xs)
         self._terminal_layout.addLayout(self._build_status_row())
-        self.caption = host.caption("Permissions and the conversation model are set in Claude Code. The task buttons "
+        self.caption = host.caption("Permissions and the conversation model are set in Claude Code. Translate types "
+                                    "its prompt here for you to send; the other task buttons "
                                     'need Cloud · Anthropic API or Local (<a href="setup">AI setup</a>).')
         self.caption.setTextFormat(Qt.TextFormat.RichText)
         self.caption.linkActivated.connect(lambda _link: (
@@ -180,8 +182,27 @@ class ClaudeCodeView(QFrame):
         """Type `@path ` at the prompt without Enter; a path with spaces is quoted."""
         if self.session is None or not self.session.running:
             return
-        self.session.write((f'@"{rel}" ' if " " in rel else f"@{rel} ").encode("utf-8"))
+        self.session.write(f"{mention(rel)} ".encode("utf-8"))
         self.terminal.focus_terminal()
+
+    def fill_prompt(self, text: str) -> bool:
+        """A task button's prompt (plugin_api.TaskPromptRoute), typed into the input box when it is on the screen and
+        empty, and never sent: no Enter follows, the user reads it and presses Enter. False without a running session;
+        the screen is read asynchronously, so a box that is not free is reported by `notice` a moment later and
+        nothing is queued or retried."""
+        if not self.session_live or self.terminal is None:
+            return False
+        self.terminal.read_screen(lambda lines: self._type_prompt(text, lines))
+        return True
+
+    def _type_prompt(self, text: str, lines: list) -> None:
+        if not self.session_live:
+            return
+        if input_box_shown(lines):
+            self.session.write(paste_bytes(text))
+            self.terminal.focus_terminal()
+        else:
+            self.notice.emit(NOT_FREE, "warning")
 
     def switch_session(self) -> bool:
         """Move the running Claude Code onto the saved default model and effort, keeping its conversation and the

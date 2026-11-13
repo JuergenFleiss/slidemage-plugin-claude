@@ -59,6 +59,11 @@ def prompt_draft(lines: list[list[str]]) -> str:
     return "\n".join(parts).strip("\n")
 
 
+def mention(rel: str) -> str:
+    """Claude Code's @mention of a project-relative path; a path with spaces is quoted."""
+    return f'@"{rel}"' if " " in rel else f"@{rel}"
+
+
 def paste_bytes(draft: str) -> bytes:
     """What types `draft` into the input box without sending it: as a bracketed paste when it has line ends (a
     line end typed would send it), as plain keystrokes otherwise."""

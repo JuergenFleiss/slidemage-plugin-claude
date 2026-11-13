@@ -477,6 +477,22 @@ def test_attaching_files_types_their_at_paths_without_enter(env, tmp_path, monke
     assert typed == [b"@sources/paper.pdf ", f"@{SLIDE} ".encode(), b"@sources/my-fig.png "]
 
 
+def test_a_task_prompt_is_typed_into_a_free_input_box_and_never_sent(env, monkeypatch):
+    start_view(env)
+    typed, notices = [], []
+    monkeypatch.setattr(env.view.session, "write", typed.append)
+    env.view.notice.connect(lambda text, tone: notices.append(text))
+    rule = "─" * 40
+    screens = {"free": [[rule] * 2, ["> ", ">"], [rule] * 2], "busy": [[rule] * 2, ["> half a question"] * 2, [rule] * 2]}
+    for state in ("free", "busy"):
+        monkeypatch.setattr(env.view.terminal, "read_screen", lambda callback, state=state: callback(screens[state]))
+        assert env.view.fill_prompt("Translate @slides/x.tex into DE. Keep labels.")
+    assert typed == [b"Translate @slides/x.tex into DE. Keep labels."]         # no Enter, not even on the free box
+    assert notices == [view_module.NOT_FREE]
+    env.view.session.stop()
+    assert not env.view.fill_prompt("Translate again.")           # no session: core says so
+
+
 def test_dropping_files_on_the_terminal_attaches_them(env, tmp_path, monkeypatch):
     from PySide6.QtCore import QMimeData, QPointF, QUrl, Qt
     from PySide6.QtGui import QDropEvent
