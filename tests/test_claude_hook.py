@@ -208,10 +208,20 @@ def test_a_bash_command_that_replaces_an_image_marks_the_slides_that_include_it(
     (root / "slides" / "img-EN-Plot-current.tex").write_text("\\includegraphics{media/plot.png}\n", encoding="utf-8")
     claude_hook.record_write(ctx, bash(root, "PreToolUse"))
     (root / "media" / "plot.png").write_bytes(b"new and longer")                 # what the command did
-    claude_hook.record_write(ctx, bash(root, "PostToolUse", tool_response={"isError": True}))   # even a failed command
+    claude_hook.record_write(ctx, bash(root, "PostToolUseFailure"))                 # a command that failed after it ran
     entry = ai_review.unreviewed(ProjectContext.at(root))["slides/img-EN-Plot-current.tex"]
     assert entry["source"] == "Claude Code terminal: Bash: media/plot.png"
     assert not any(ctx._snapshot("t1").parent.glob("*.json"))                      # the snapshot is deleted
+
+
+def test_main_ends_a_failed_bash_command_too(root, monkeypatch, capsys):
+    from slidemage import ai_review
+    (root / "media").mkdir(exist_ok=True)
+    (root / "slides" / "img-EN-Plot-current.tex").write_text("\\includegraphics{media/plot.png}\n", encoding="utf-8")
+    assert run_main(monkeypatch, capsys, json.dumps(bash(root, "PreToolUse")), root)[0] == 0
+    (root / "media" / "plot.png").write_bytes(b"new")
+    assert run_main(monkeypatch, capsys, json.dumps(bash(root, "PostToolUseFailure")), root)[0] == 0
+    assert "slides/img-EN-Plot-current.tex" in ai_review.unreviewed(ProjectContext.at(root))
 
 
 def test_a_bash_command_that_leaves_the_images_alone_marks_nothing(ctx, root):

@@ -132,6 +132,7 @@ def settings(hook: str) -> dict:
     return {
         "hooks": {"PreToolUse": [{"matcher": HOOK_MATCHER, "hooks": [{"type": "command", "command": hook}]}],
                   "PostToolUse": [{"matcher": HOOK_MATCHER, "hooks": [{"type": "command", "command": hook}]}],
+                  "PostToolUseFailure": [{"matcher": "Bash", "hooks": [{"type": "command", "command": hook}]}],
                   "UserPromptSubmit": [{"hooks": [{"type": "command", "command": hook}]}]},
         "permissions": {"allow": [f"mcp__{SERVER_NAME}__{t.spec.name}" for t in CLAUDE_CODE_PRE_APPROVED]}}
 

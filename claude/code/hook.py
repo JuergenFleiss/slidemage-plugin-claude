@@ -33,6 +33,7 @@ UNREADABLE_MESSAGE = ("{name} cannot be read as UTF-8 text, so SlideMage cannot 
                       "slide's protected parts alone. Ask the user to look at the file.")
 FILE_TOOLS = ("Edit", "Write", "MultiEdit")
 SHELL_TOOL = "Bash"
+AFTER_EVENTS = ("PostToolUse", "PostToolUseFailure")      # the failure event is registered for Bash only
 
 
 # The same user-facing guard as SlideMage's slide_protection; only the public span reader is needed.
@@ -132,8 +133,9 @@ def blocked_reason(ctx: Any, event: dict) -> str | None:
 
 def record_shell(ctx: Any, event: dict) -> None:
     """A shell command can replace an image file: Pre keeps the project's image files, Post marks the live slides
-    that include one that changed. Done whether the command succeeded or not (it may have stopped half-way). A
-    SlideMage without these hook methods leaves such changes unmarked."""
+    that include one that changed. A command that fails ends in PostToolUseFailure, not PostToolUse, and may have
+    changed an image before it did (cp, then a failed compile), so both end the call. A SlideMage without these hook
+    methods leaves such changes unmarked."""
     if not hasattr(ctx, "media_snapshot"):
         return
     identity = str(event.get("tool_use_id") or f"{event.get('session_id', '')}:shell")
@@ -197,7 +199,7 @@ def main(args: list[str] | None = None) -> int:
                 print(claude_scope.prompt_context(data))   # stdout becomes context for this prompt
             return 0
         ctx = hook_context_from_environment()
-        if isinstance(event, dict) and event.get("hook_event_name") == "PostToolUse":
+        if isinstance(event, dict) and event.get("hook_event_name") in AFTER_EVENTS:
             record_write(ctx, event)
             return 0
         reason = blocked_reason(ctx, event) if isinstance(event, dict) else None

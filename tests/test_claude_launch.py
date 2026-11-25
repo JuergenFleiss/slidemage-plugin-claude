@@ -84,6 +84,7 @@ def test_the_command_line_carries_the_mcp_server_the_hook_and_the_orientation(tm
         {"type": "command", "command": "HOOK COMMAND"}]}],
         "PostToolUse": [{"matcher": "Edit|Write|MultiEdit|Bash", "hooks": [
             {"type": "command", "command": "HOOK COMMAND"}]}],
+        "PostToolUseFailure": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "HOOK COMMAND"}]}],
         "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "HOOK COMMAND"}]}]}
     assert settings["permissions"]["allow"] == [f"mcp__slidemage__{t.spec.name}" for t in CLAUDE_CODE_PRE_APPROVED]
     assert "add_slide" not in " ".join(settings["permissions"]["allow"])        # it changes files: Claude asks
