@@ -12,7 +12,8 @@ v0.14.25 those are the '%%' lines at the top of a slide and its \\setSlideVersio
 the top are editable; before, the whole comment block at the top was protected. \\vbox to 0pt{...} blocks are not
 protected since SlideMage v9.4.0. The messages say whichever rule the running SlideMage applies (notes_editable).
 Everything else, and anything this hook cannot work out (except a slide that exists but cannot be read), is allowed: it must never get in the way of a
-call that is fine, and a crash is only a warning. It cannot see what a Bash command does to a file.
+call that is fine, and a crash is only a warning. It cannot judge what a Bash command does to a file, but it notes which
+image files a Bash command changed, so that the slides including them are marked for review (record_shell).
 """
 from __future__ import annotations
 
@@ -31,6 +32,7 @@ FROZEN_MESSAGE = ("{name} is a frozen version of a slide: a historical record, r
 UNREADABLE_MESSAGE = ("{name} cannot be read as UTF-8 text, so SlideMage cannot check that the edit leaves the "
                       "slide's protected parts alone. Ask the user to look at the file.")
 FILE_TOOLS = ("Edit", "Write", "MultiEdit")
+SHELL_TOOL = "Bash"
 
 
 # The same user-facing guard as SlideMage's slide_protection; only the public span reader is needed.
@@ -128,6 +130,22 @@ def blocked_reason(ctx: Any, event: dict) -> str | None:
     return protected_problem(before, after) if after is not None else None
 
 
+def record_shell(ctx: Any, event: dict) -> None:
+    """A shell command can replace an image file: Pre keeps the project's image files, Post marks the live slides
+    that include one that changed. Done whether the command succeeded or not (it may have stopped half-way). A
+    SlideMage without these hook methods leaves such changes unmarked."""
+    if not hasattr(ctx, "media_snapshot"):
+        return
+    identity = str(event.get("tool_use_id") or f"{event.get('session_id', '')}:shell")
+    if event.get("hook_event_name") == "PreToolUse":
+        ctx.write_snapshot(identity, {"media": ctx.media_snapshot()})
+        return
+    saved = ctx.read_snapshot(identity)
+    ctx.delete_snapshot(identity)
+    if isinstance(saved.get("media"), dict):
+        ctx.mark_media_changes(saved["media"], f"Claude Code terminal: {SHELL_TOOL}")
+
+
 def record_write(ctx: Any, event: dict) -> None:
     """Pre captures text; successful Post records the slide and inserted calls, and sends a citation
     changed in the image descriptions store (media/alt-text.json) to review.
@@ -135,6 +153,9 @@ def record_write(ctx: Any, event: dict) -> None:
     Tool ids isolate simultaneous calls. The temporary pre snapshot is only
     needed to identify deck insertions and no-op writes; the review store itself is locked.
     """
+    if event.get("tool_name") == SHELL_TOOL:
+        record_shell(ctx, event)
+        return
     args = event.get("tool_input")
     raw = args.get("file_path") if isinstance(args, dict) else None
     if event.get("tool_name") not in FILE_TOOLS or not isinstance(raw, str):

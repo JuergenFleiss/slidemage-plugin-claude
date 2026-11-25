@@ -194,3 +194,36 @@ def test_a_note_at_the_top_may_change_when_slidemage_allows_it(ctx, root):
 def test_the_message_follows_the_running_slidemage_and_never_names_overlay_blocks():
     assert "vbox" not in PROTECTED_MESSAGE and "setSlideVersion" in PROTECTED_MESSAGE
     assert ("may be edited" in PROTECTED_MESSAGE) == notes_editable()
+
+
+def bash(root, phase, **more):
+    return {"session_id": "s", "cwd": str(root), "hook_event_name": phase, "tool_name": "Bash", "tool_use_id": "t1",
+            "tool_input": {"command": "cp new.png media/plot.png"}, **more}
+
+
+def test_a_bash_command_that_replaces_an_image_marks_the_slides_that_include_it(ctx, root):
+    from slidemage import ai_review
+    (root / "media").mkdir(exist_ok=True)
+    (root / "media" / "plot.png").write_bytes(b"old")
+    (root / "slides" / "img-EN-Plot-current.tex").write_text("\\includegraphics{media/plot.png}\n", encoding="utf-8")
+    claude_hook.record_write(ctx, bash(root, "PreToolUse"))
+    (root / "media" / "plot.png").write_bytes(b"new and longer")                 # what the command did
+    claude_hook.record_write(ctx, bash(root, "PostToolUse", tool_response={"isError": True}))   # even a failed command
+    entry = ai_review.unreviewed(ProjectContext.at(root))["slides/img-EN-Plot-current.tex"]
+    assert entry["source"] == "Claude Code terminal: Bash: media/plot.png"
+    assert not any(ctx._snapshot("t1").parent.glob("*.json"))                      # the snapshot is deleted
+
+
+def test_a_bash_command_that_leaves_the_images_alone_marks_nothing(ctx, root):
+    from slidemage import ai_review
+    claude_hook.record_write(ctx, bash(root, "PreToolUse"))
+    claude_hook.record_write(ctx, bash(root, "PostToolUse"))
+    assert ai_review.unreviewed(ProjectContext.at(root)) == {}
+
+
+def test_a_slidemage_without_the_image_methods_leaves_bash_alone(root):
+    class OldContext:
+        def __getattr__(self, name):
+            raise AttributeError(name)               # an older HookContext has no image methods
+    claude_hook.record_write(OldContext(), bash(root, "PreToolUse"))
+    claude_hook.record_write(OldContext(), bash(root, "PostToolUse"))

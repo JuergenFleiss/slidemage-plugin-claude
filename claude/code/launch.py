@@ -27,7 +27,7 @@ from slidemage.plugin_api import IMAGE_DESCRIPTION_RULES, CLAUDE_CODE_PRE_APPROV
 
 SERVER_NAME = "slidemage"
 TOKEN_ENV = "SLIDEMAGE_MCP_TOKEN"
-HOOK_MATCHER = "Edit|Write|MultiEdit"
+HOOK_MATCHER = "Edit|Write|MultiEdit|Bash"
 INSTALL_URL = "https://docs.claude.com/en/docs/claude-code/setup"
 AUTH_TIMEOUT_S = 15
 

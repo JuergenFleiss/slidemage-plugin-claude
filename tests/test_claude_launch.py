@@ -80,9 +80,9 @@ def test_the_command_line_carries_the_mcp_server_the_hook_and_the_orientation(tm
     assert json.loads(flags["--mcp-config"]) == {"mcpServers": {"slidemage": {
         "type": "http", "url": URL, "headers": {"Authorization": "Bearer ${SLIDEMAGE_MCP_TOKEN}"}}}}
     settings = json.loads(flags["--settings"])
-    assert settings["hooks"] == {"PreToolUse": [{"matcher": "Edit|Write|MultiEdit", "hooks": [
+    assert settings["hooks"] == {"PreToolUse": [{"matcher": "Edit|Write|MultiEdit|Bash", "hooks": [
         {"type": "command", "command": "HOOK COMMAND"}]}],
-        "PostToolUse": [{"matcher": "Edit|Write|MultiEdit", "hooks": [
+        "PostToolUse": [{"matcher": "Edit|Write|MultiEdit|Bash", "hooks": [
             {"type": "command", "command": "HOOK COMMAND"}]}],
         "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "HOOK COMMAND"}]}]}
     assert settings["permissions"]["allow"] == [f"mcp__slidemage__{t.spec.name}" for t in CLAUDE_CODE_PRE_APPROVED]
