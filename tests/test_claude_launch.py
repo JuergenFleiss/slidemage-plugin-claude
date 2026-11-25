@@ -80,6 +80,7 @@ def test_the_command_line_carries_the_mcp_server_the_hook_and_the_orientation(tm
     assert json.loads(flags["--mcp-config"]) == {"mcpServers": {"slidemage": {
         "type": "http", "url": URL, "headers": {"Authorization": "Bearer ${SLIDEMAGE_MCP_TOKEN}"}}}}
     settings = json.loads(flags["--settings"])
+    assert settings["spinnerTipsEnabled"] is False       # the tips take too much room in the narrow panel
     assert settings["hooks"] == {"PreToolUse": [{"matcher": "Edit|Write|MultiEdit", "hooks": [
         {"type": "command", "command": "HOOK COMMAND"}]}],
         "PostToolUse": [{"matcher": "Edit|Write|MultiEdit", "hooks": [

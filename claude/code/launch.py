@@ -127,9 +127,11 @@ def mcp_config(url: str) -> dict:
 
 
 def settings(hook: str) -> dict:
-    """Extra settings for this session only: the protected-region hook, and the pre-approved tools allowed
-    without asking (add_slide asks, like any tool that changes files)."""
+    """Extra settings for this session only: the protected-region hook, the pre-approved tools allowed
+    without asking (add_slide asks, like any tool that changes files), and no spinner tips, which wrap over
+    several lines in the narrow panel."""
     return {
+        "spinnerTipsEnabled": False,
         "hooks": {"PreToolUse": [{"matcher": HOOK_MATCHER, "hooks": [{"type": "command", "command": hook}]}],
                   "PostToolUse": [{"matcher": HOOK_MATCHER, "hooks": [{"type": "command", "command": hook}]}],
                   "UserPromptSubmit": [{"hooks": [{"type": "command", "command": hook}]}]},
